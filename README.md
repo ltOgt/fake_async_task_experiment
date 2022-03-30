@@ -1,16 +1,86 @@
 # fake_async_task
 
-A new Flutter project.
+Since flutter is single threaded, long non-async calculations can freeze the ui.
 
-## Getting Started
+Interrupting a non-async calculation with await `Future.delayed(const Duration(microseconds: 1));` is pretty hacky, but actually works.
 
-This project is a starting point for a Flutter application.
+Its important to set the interrupts at good points though.
 
-A few resources to get you started if this is your first Flutter project:
+- for (calc % 1000) == 0; the fake async took 5 seconds instead of .5
 
-- [Lab: Write your first Flutter app](https://flutter.dev/docs/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://flutter.dev/docs/cookbook)
+- for (calc % 10000) == 0; the fake async took 1.5 seconds instead of .5
 
-For help getting started with Flutter, view our
-[online documentation](https://flutter.dev/docs), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- for (calc % 100000) == 0; the fake async did not give the ui enough space to update.
+
+so for the middle case the calculation is interrupted enough to let the ui update, but slow down the calculation not too much.
+
+```dart
+import 'package:flutter/material.dart';
+
+void main() {
+  runApp(MyApp());
+}
+
+class MyApp extends StatefulWidget {
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  bool isFakeAsync = true;
+  bool isCalcRunning = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        floatingActionButton: FloatingActionButton(
+          child: Icon(
+            isFakeAsync //
+                ? Icons.radio_button_checked
+                : Icons.radio_button_unchecked,
+          ),
+          onPressed: () {
+            setState(() {
+              isFakeAsync = !isFakeAsync;
+            });
+          },
+        ),
+        body: isCalcRunning
+            ? const CircularProgressIndicator()
+            : FloatingActionButton(
+                child: const Icon(Icons.calculate),
+                onPressed: () async {
+                  setState(() {
+                    isCalcRunning = true;
+                  });
+                  // give time to at least show circular if not fakeAsync
+                  await Future.delayed(const Duration(milliseconds: 10));
+                  await longCalc();
+                  setState(() {
+                    isCalcRunning = false;
+                  });
+                },
+              ),
+      ),
+    );
+  }
+
+  Future<void> longCalc() async {
+    final t0 = DateTime.now();
+    for (int i = 0; i < 10000; i++) {
+      for (int j = 0; j < 10000; j++) {
+        final calc = i + j;
+        bool isDividableBy10000 = (calc % 100000) == 0;
+        if (isDividableBy10000) {
+          if (isFakeAsync) {
+            await Future.delayed(const Duration(microseconds: 1));
+          }
+        }
+      }
+    }
+    print("done in ${DateTime.now().difference(t0)}");
+  }
+}
+
+```
