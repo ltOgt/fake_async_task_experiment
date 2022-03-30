@@ -71,7 +71,7 @@ class _MyAppState extends State<MyApp> {
     for (int i = 0; i < 10000; i++) {
       for (int j = 0; j < 10000; j++) {
         final calc = i + j;
-        bool isDividableBy10000 = (calc % 100000) == 0;
+        bool isDividableBy10000 = (calc % 10000) == 0;
         if (isDividableBy10000) {
           if (isFakeAsync) {
             await Future.delayed(const Duration(microseconds: 1));
